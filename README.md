@@ -8,7 +8,7 @@ There are 4 major parts of the project.
 2. Processing raw_data to create a daily dataset, by averaging each hourly measure, and containing also the weather variables and the
 names for each pollutant parameter.
 3. Generating a descriptive analysis with correlation matrices, scatterplots, time series charts …
-4. Creating a linear regression model that explains NO2
+# 4. Creating a linear regression model that explains NO2
 
 
 ## Dataset 
