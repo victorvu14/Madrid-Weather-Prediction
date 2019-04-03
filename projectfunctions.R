@@ -1,5 +1,17 @@
 ###### FUNCTIONS #######
 
+# There’s 72 csv files, each one containing a piece of hourly pollution data from Madrid, in the period 2011 to 2016.
+# Specifically, each csv contains the raw data for a concrete month of a concrete year (6 years, 12 months per year).
+# There are 2 more separates dataset: 
+   ## Weather.xlsx, containing daily time series for min, average, and max temperature, precipitations, humidity and wind in Madrid.
+   ## parameters.png (image), containing the key for every pollutant code (eg. “08” - NO2)
+
+# Our task is to: Reading every piece of raw data and creating the whole initial raw_data set. 
+    ## Processing raw_data to create a daily dataset, by averaging each hourly measure, and containing also the weather variables
+    ##  and the names for each pollutant parameter. 
+    ## Create ShinyApp to analyze the interactions of different weather variables 
+
+
 readAllHourlyDataCSVs <- function(years,months) {
   ## Initialize empty data frame to store all data
   hourlyPollutants <- data.frame();
