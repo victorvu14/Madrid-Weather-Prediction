@@ -1,0 +1,368 @@
+---
+title: "Pollutants and Weather Variables in Madrid"
+author: "Group H"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### (A) Getting source files
+
+##### Loading of source files to get acccess to helper functions
+
+```{r}
+source('projectfunctions.R')
+```
+
+### (B) Importing necessary packages/libraries
+
+```{r}
+## Get data.table package if not installed
+if(!"data.table" %in% installed.packages()) {
+  install.packages("data.table")
+} else {
+  print('data.table package already installed')
+}
+library(data.table)
+## Get ggplot if not installed
+if(!"ggplot2" %in% installed.packages()) {
+  install.packages("ggplot2")
+} else {
+  print('ggplot2 package already installed')
+}
+library(ggplot2) 
+
+## Get readxl package if not installed
+if(!"readxl" %in% installed.packages()) {
+  install.packages("readxl")
+} else {
+  print('readxl package already installed')
+}
+library(readxl)
+
+## Get corrplot package if not installed
+if(!"corrplot" %in% installed.packages()) {
+  install.packages("corrplot")
+} else {
+  print('corrplot package already installed')
+}
+
+library(corrplot)
+
+## Get dygraph package if not installed
+if(!"dygraphs" %in% installed.packages()) {
+  install.packages("dygraphs")
+} else {
+  print('dygraphs package already installed')
+}
+
+library(dygraphs)
+
+## Get shiny package if not installed
+if(!"shiny" %in% installed.packages()) {
+  install.packages("shiny")
+} else {
+  print('shiny package already installed')
+}
+
+library(shiny)
+
+## Get dplyr package if not installed
+if(!"dplyr" %in% installed.packages()) {
+  install.packages("dplyr")
+} else {
+  print('dplyr package already installed')
+}
+
+library(dplyr)
+
+## Get d3heatmap package if not installed
+if(!"d3heatmap" %in% installed.packages()) {
+  install.packages("d3heatmap")
+} else {
+  print('d3heatmap package already installed')
+}
+
+library(d3heatmap)
+
+## Get xts package if not installed
+if(!"xts" %in% installed.packages()) {
+  install.packages("xts")
+} else {
+  print('xts package already installed')
+}
+
+library(xts)
+
+## Get leaflet package if not installed
+if(!"leaflet" %in% installed.packages()) {
+  install.packages("leaflet")
+} else {
+  print('leaflet package already installed')
+}
+
+library(leaflet)
+```
+
+
+### (C) Defining Constants to be used throughout script
+###### This was used for faster testing
+
+```{r}
+years <- 11
+months <- 1:12
+```
+
+### (D) Load data
+
+#### 1) Load raw_data (whole initial data set for pollutants) from hourly data sets
+```{r}
+raw_data <- readAllHourlyDataCSVs(years, months)
+print(readAllHourlyDataCSVs)
+print(readHourlyDataCSV)
+head(raw_data)
+```
+
+#### 2) Get pollutants names and merge with raw_data
+```{r}
+pollutant_names <- getPollutantNames();
+raw_data  <- merge(raw_data, pollutant_names, by.x='parameter', by.y='parameter')
+head(raw_data)
+```
+
+#### 3) Average hourly pollutant data to get one mean value per day, per pollutant
+```{r}
+raw_data_table <- data.table(raw_data)
+avgByParameterAndDate <- raw_data_table[,.(mean_value=mean(value,na.rm=T)), by=list(formula, date)]
+head(avgByParameterAndDate)
+```
+#### 4) Dcast into tabular format
+```{r}
+allPollutantDataByDate <- dcast(avgByParameterAndDate, date~formula)
+head(allPollutantDataByDate)
+```
+
+#### 5) Get daily weather data from excel file
+```{r}
+weather <- getWeatherData()
+print(getWeatherData)
+head(weather)
+```
+
+#### 6) Add weather data to tabular pollutant data
+```{r}
+allPollutantDataByDate <- as.data.frame(allPollutantDataByDate)
+avgByParameterAndDateWeather <- merge(allPollutantDataByDate, weather, by.x='date', by.y='date')
+head(avgByParameterAndDateWeather)
+```
+
+#### 7) Get monthly average data set
+```{r}
+monthlyAvgPollutantsAndWeather <- getMonthlyAverages(avgByParameterAndDateWeather)
+print(getMonthlyAverages)
+head(monthlyAvgPollutantsAndWeather)
+```
+
+#### 8) Generate average pollutant dataset by station
+```{r}
+raw_data_table$year = format(raw_data_table$date, '%Y')
+yearlyAveragesPollutantByStation <- raw_data_table[,.(mean_value=mean(value,na.rm=T)), by=list(station, year,formula)]
+head(yearlyAveragesPollutantByStation)
+```
+
+##### 9) Get station details from stations csv
+###### Source of data: https://www.kaggle.com/decide-soluciones/air-quality-madrid
+```{r}
+stationDetails = read.csv('stations.csv')
+stationDetails$id = as.factor(stationDetails$id)
+head(stationDetails)
+```
+
+#### 10) Merge station locations with yearlyAveragesPollutantByStation
+```{r}
+yearlyAveragesPollutantByStation = merge(yearlyAveragesPollutantByStation, stationDetails, by.x='station', by.y='id' )
+head(yearlyAveragesPollutantByStation)
+```
+
+#### 11) Summary of existing variables and data sets
+
+##### avgByParameterAndDate
+```{r}
+str(avgByParameterAndDate)
+```
+
+##### avgByParameterAndDateWeather
+```{r}
+str(avgByParameterAndDateWeather)
+```
+
+##### monthlyAvgPollutantsAndWeather
+```{r}
+str(monthlyAvgPollutantsAndWeather)
+```
+
+##### yearlyAveragesPollutantByStation
+```{r}
+str(yearlyAveragesPollutantByStation)
+```
+
+### (E) Descriptive Analysis
+
+#### 1) Missingness Analysis of each of the datasets
+```{r}
+sapply(avgByParameterAndDate, function(var) return(sum(is.na(var))))
+sapply(avgByParameterAndDateWeather, function(var) return(sum(is.na(var))))
+sapply(monthlyAvgPollutantsAndWeather, function(var) return(sum(is.na(var))))
+sapply(yearlyAveragesPollutantByStation, function(var) return(sum(is.na(var))))
+```
+
+#### 2) Comparison of pollutant measures by station (shiny app)
+```{r}
+pollutantOptions <- unique(yearlyAveragesPollutantByStation$formula)
+yearOptions<- paste0('20', as.character(years))
+  
+mapShinyApp(yearOptions,pollutantOptions,yearlyAveragesPollutantByStation)
+```
+
+#### 3) Box plot for pollutant measures
+```{r}
+ggplot(data=avgByParameterAndDate, aes(y=mean_value, colour=formula)) + geom_boxplot()
+```
+
+#### 4) Correlation Matrix between all measured variables
+```{r}
+correlationMatrix <- cor(avgByParameterAndDateWeather[,names(avgByParameterAndDateWeather)[sapply(avgByParameterAndDateWeather, is.numeric)]])
+corrplot(correlationMatrix, method='circle', type='lower')
+```
+
+#### 5) Correlation calculation and select top most correlated 
+```{r}
+reduced_correlation_df <- as.data.frame(as.table(correlationMatrix))
+reduced_correlation_df <- reduced_correlation_df %>%  arrange(desc(Freq)) %>% filter(Freq>abs(0.8)) %>% filter(Freq!=1)
+head(reduced_correlation_df, 10)
+```
+
+#### 6) Scatter Plots between variables that show as highly correlated
+```{r}
+par(mfrow=c(2,2)) 
+#NO vs CO
+plot(y= avgByParameterAndDateWeather$NO,x = avgByParameterAndDateWeather$CO,
+     xlab='CO',ylab='NO',main = "CO vs NO")
+abline(mC <- lm(NO~ CO, data = avgByParameterAndDateWeather))
+#CO vs BEN
+plot(y=avgByParameterAndDateWeather$CO,x=avgByParameterAndDateWeather$BEN,
+     xlab='BEN',ylab='CO', main = "BEN vs CO")
+abline(mC <- lm(CO~ BEN, data = avgByParameterAndDateWeather))
+#NO vs BEN
+plot(y= avgByParameterAndDateWeather$NO,x= avgByParameterAndDateWeather$BEN,
+     xlab='BEN',ylab='NO', main = "BEN vs NO")
+#BEN vs TOL
+plot(y= avgByParameterAndDateWeather$BEN,x = avgByParameterAndDateWeather$TOL,
+     xlab='TOL',ylab='BEN', main = "TOL vs BEN")
+```
+
+#### 7) Plotting the NO2 values against the measures that seem highly correlated
+```{r}
+par(mfrow=c(2,2)) 
+plot(y = avgByParameterAndDateWeather$NO2,x = avgByParameterAndDateWeather$wind_avg_speed,
+     xlab='Wind Avg Speed',ylab='NO2', main = "Wind Avg Speed vs NO2", col ='darkblue')
+abline(mC <- lm(NO2 ~ wind_avg_speed, data = avgByParameterAndDateWeather))
+
+plot(y = avgByParameterAndDateWeather$NO2,x = avgByParameterAndDateWeather$TOL,
+     xlab='TOL',ylab='NO2', main = "TOL vs NO2", col = 'darkgreen')
+abline(mC <- lm(NO2 ~ TOL, data = avgByParameterAndDateWeather))
+
+plot(y = avgByParameterAndDateWeather$NO2,x = avgByParameterAndDateWeather$O3,
+     xlab='O3',ylab='NO2', main = "O3 vs NO2", col = 'darkred')
+abline(mC <- lm(NO2 ~ O3, data = avgByParameterAndDateWeather))
+
+plot(y = avgByParameterAndDateWeather$NO2,x = avgByParameterAndDateWeather$CO,
+     xlab='CO',ylab='NO2', main = "CO vs NO2", col = 'darkorange')
+abline(mC <- lm(NO2 ~ CO, data = avgByParameterAndDateWeather))
+```
+
+```{r}
+formulaOptions <- colnames(avgByParameterAndDateWeather)[2:length(colnames(avgByParameterAndDateWeather))]
+startDateValue <- as.Date(paste0('20', years[1], '-', months[1], '-', '1'))
+endYear <- years[length(years)]
+endMonth <- months[length(months)]
+endDateValue <- as.Date(paste0('20', endYear, '-', endMonth, '-', numberOfDaysInMonth(endMonth,endYear)))
+
+runShinyApp(formulaOptions, avgByParameterAndDateWeather, monthlyAvgPollutantsAndWeather, startDateValue, endDateValue, correlationMatrix)
+```
+
+### (F) Linear Regression for NO2
+
+#### First let's do a linear regresion for NO2 with all varialbes
+```{r}
+lm1 <- lm(avgByParameterAndDateWeather$NO2~., data=avgByParameterAndDateWeather[,!colnames(avgByParameterAndDateWeather)%in%c('date')])
+summary(lm1)
+```
+
+#### Since we see that not all of these variables look significant (pvalues) let's try to do a stepwise regression algorith to select significant variables against NO2
+```{r}
+lm2 <- step(lm1, direction = 'both')
+summary(lm2)
+```
+#### Some of the variables in our regression however seem to be correlated, let's try to manually remove the ones that logically should be correlated
+```{r}
+lm3 <- lm(avgByParameterAndDateWeather$NO2~., data=avgByParameterAndDateWeather[,!colnames(avgByParameterAndDateWeather)%in%c('date', 'temp_min', 'temp_max', 'precipitation', 'PM2.5')])
+summary(lm3)
+```
+
+#### Let's run a PCA to automatically handle the correlations between the varialbes and simplify the number of variables in the linear calculations
+```{r}
+### Calculate a linear regression using PCA
+PCA <- princomp(avgByParameterAndDateWeather[,names(avgByParameterAndDateWeather)[sapply(avgByParameterAndDateWeather, is.numeric)]], cor=TRUE)
+
+### Calculate and display variance of components
+PCA_var = (PCA$sdev)^2
+prop_varex <- PCA_var/sum(PCA_var)
+
+plot(prop_varex, xlab = "Principal Component",
+     ylab = "Proportion of Variance Explained",
+     type = "b")
+plot(cumsum(prop_varex), xlab = "Principal Component",
+     ylab = "Cumulative Proportion of Variance Explained",
+     type = "b")
+
+### Based on analysis on plots above, we will select the 9 first PCA components
+communality <- rep(0,ncol(PCA$loadings))
+NPCA <- 9
+
+for(i in 1:NPCA) {
+  communality <- communality + PCA$loadings[,i]^2
+}
+
+### Get a dataset with chosen PCAs and NO2 to create the linear regression on
+PCAScores <- as.data.frame(PCA$scores[,1:9])
+tolm <- cbind(avgByParameterAndDateWeather$NO2,PCAScores,avgByParameterAndDateWeather$date)
+colnames(tolm)[1] = 'NO2'
+colnames(tolm)[11] = 'date'
+
+### Create a linear regression
+lm4 <- lm(tolm$NO2 ~ tolm[,2]+tolm[,3]+tolm[,4]+tolm[,5]+tolm[,6]+tolm[,7]+tolm[,8]+tolm[,9]+tolm[,10], data=tolm)
+
+### Calculate the fitted values for linear regression and add to previous dataset 
+lm_fit<-fitted(lm4)
+tolm1<- cbind(tolm,lm_fit)
+head(tolm1) 
+
+### Melt previous dataset for plotting
+metled_lm_fit <- melt(tolm1[, c('date','NO2','lm_fit')], id.vars='date')
+
+ggplot(metled_lm_fit, aes(x=date, y=value, group=variable,colour=variable))+geom_line(lwd=1, alpha=0.7)+scale_color_manual(values=c('black','red'))+ theme(axis.text.x=element_text(angle=90))
+
+summary(lm4)
+```
+#### Let's graph the residuals for each of these linear regressions
+```{r}
+residuals <- as.data.frame(cbind(lm1$residuals, lm2$residuals, lm3$residuals, lm1$residuals))
+colnames(residuals) <- c('LM1', 'LM2', 'LM3', 'LM4')
+head(residuals)
+ggplot(melt(residuals)) + geom_boxplot(aes(y=value, colour=variable))
+ggplot(melt(residuals)) + geom_density(aes(x=value, colour=variable))
+```
